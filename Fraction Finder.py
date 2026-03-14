@@ -1,12 +1,16 @@
 import streamlit as st
-import FractionGeneration as fg
-import chatflow as cf
-import StimuliAnalysis as sa 
+from Task_1 import FractionGeneration as fg
+from Task_1 import chatflow as cf
+from Task_1 import StimuliAnalysis as sa 
 import tempfile
 
 st.set_page_config(page_title="Fraction Finder", layout="centered")
 st.title("Fraction Finder")
 CHAT_FLOW = cf.chat_flow
+
+# st.sidebar.title("Navigation")
+# if st.sidebar.button("Chatbot"):
+#     st.switch_page(r"pages/Chat.py")
 
 # ---------------------------
 # Initialize session state
@@ -38,9 +42,12 @@ state_info = CHAT_FLOW.get(current_state, {})
 # ---------------------------
 # UI Rendering 
 # ---------------------------
+should_show_uploader = state_info.get("expects_file") and not st.session_state.get("generated_file")
+
 with st.chat_message("assistant"):
     # Assistant message
-    st.write(state_info.get("text", ""))
+    if not state_info.get("expects_file") or should_show_uploader:
+        st.write(state_info.get("text", ""))
 
     # Multi-select for filters
     if state_info.get("multi_select"):
@@ -66,15 +73,15 @@ with st.chat_message("assistant"):
                     st.session_state.state = next_state
                     st.rerun()
     
-    if state_info.get("expects_file"):
+    # Expects file
+    if state_info.get("expects_file") and not st.session_state.get("generated_file"):
         uploaded_file = st.file_uploader("Upload CSV or PDF", type=["csv", "pdf"])
         if uploaded_file is not None:
-            # Save the uploaded file to a temporary path
+            # Saves the uploaded file to a temporary path
             with tempfile.NamedTemporaryFile(delete=False, suffix=f".{uploaded_file.name.split('.')[-1]}") as tmp:
                 tmp.write(uploaded_file.getvalue())
                 tmp_path = tmp.name
 
-            # Call your stimuli_analysis function with the temp file path
             generated_file = sa.stimuli_analysis(tmp_path)
             st.session_state["generated_file"] = generated_file
 
@@ -84,15 +91,12 @@ with st.chat_message("assistant"):
                 "content": uploaded_file.name
             })
 
-            # Add a new assistant message saying the file is generated
+            # Add a new message saying the file is generated
             st.session_state["messages"].append({
                 "role": "assistant",
                 "content": f"File generated: {generated_file}"
             })
 
-            # Move to next state
-            st.session_state["state"] = state_info.get("next_state", "start")
-            st.rerun()
 
 
 # ---------------------------
@@ -119,8 +123,9 @@ if current_state == "follow_up_filters" and not st.session_state["filter_queue"]
     if "generated_file" not in st.session_state or st.session_state["generated_file"] is None:
         output_file = fg.getFilteredPairs(st.session_state["sub_filters"])
         st.session_state["generated_file"] = output_file
+        st.session_state["state"] = "download_files"
 
-# Show download button if CSV exists
+# Show download button if the CSV exists
 if st.session_state["generated_file"]:
     with open(st.session_state["generated_file"], "rb") as f:
         st.download_button(
@@ -130,7 +135,6 @@ if st.session_state["generated_file"]:
             mime="text/csv"
         )
 
-    if st.button("Done / Next"):
-        st.session_state["state"] = "generate_results"
-        st.session_state["generate_file"] = None
+    if st.button("Start Over"):
+        st.session_state.clear()
         st.rerun()

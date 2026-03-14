@@ -1,7 +1,7 @@
 from collections import defaultdict
 import csv
-import Fraction as fr
-import FractionGeneration as fgr
+from Task_1 import Fraction as fr
+from Task_1 import FractionGeneration as fgr
 
 #Fraction Getters 
 def getFractions():
