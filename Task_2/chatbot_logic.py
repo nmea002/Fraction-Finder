@@ -33,9 +33,6 @@ def match_author(prompt, authors, threshold=THRESH):
     else:
         return None, best_score
 
-def similarity(a, b):
-    return fuzz.partial_ratio(a, b) 
-
 def match_intents(prompt, master_intents, threshold=float(THRESH)/100.0, exact_boost: float = 0.15):
     prompt = normalize(prompt)
 

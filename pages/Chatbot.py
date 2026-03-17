@@ -7,4 +7,4 @@ st.title("Chatbot")
 # if st.sidebar.button("Main (Fraction Finder)"):
 #     st.switch_page("main.py")
 
-st.write("If you see this, the page routing works.")
+st.write("WIP: This page will eventually host the chatbot interface.")
