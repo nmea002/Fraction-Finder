@@ -65,6 +65,9 @@ master_intents = {
     "compatibility": {
         "options": {
             "Compatible": [
+                "compatible",
+                "contains compatible stimuli",
+                "has compatible stimuli",
                 "compatible with whole number bias",
                 "follows whole number bias",
                 "agrees with whole number bias",
@@ -74,6 +77,9 @@ master_intents = {
             ],
             "Misleading": [
                 "Misleading",
+                "misleading",
+                "contains misleading stimuli",
+                "has misleading stimuli",
                 "misleading with whole number bias",
                 "violates whole number bias",
                 "goes against whole number bias",

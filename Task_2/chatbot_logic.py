@@ -1,63 +1,99 @@
-from rapidfuzz import fuzz
-import re
+from __future__ import annotations
 
-THRESH = 80
+import os
+from typing import Dict, List
 
-def normalize(prompt):
-    prompt = prompt.lower()
-    prompt = re.sub(r"et al\.?", "", prompt)
-    prompt = re.sub(r"[^\w\s]", "", prompt)
-    prompt = prompt.strip()
-    return prompt
+from Task_2.query_pipeline import (
+	build_sql,
+	parse_user_prompt,
+	run_sql_query,
+	run_supabase_query,
+)
 
-def match_year(prompt):
-    year_match = re.search(r"\b(18|19|20)\d{2}\b", prompt)
-    year = int(year_match.group()) 
-    return year 
 
-def match_author(prompt, authors, threshold=THRESH):
-    prompt = normalize(prompt)
+Message = Dict[str, str]
 
-    best_match = None
-    best_score = 0
 
-    for name in authors:
-        name = normalize(name)
-        score = fuzz.partial_ratio(name, prompt)
-        if score > best_score:
-            best_score = score
-            best_match = name
+def _format_filters_for_user(parsed) -> str:
+	parts: list[str] = []
 
-    if best_score >= threshold:
-        return best_match, best_score
-    else:
-        return None, best_score
+	if parsed.intent_values:
+		parts.append(f"compatibility={', '.join(parsed.intent_values)}")
+	if parsed.unit_values:
+		parts.append(f"unit={', '.join(parsed.unit_values)}")
+	if parsed.benchmark_values:
+		parts.append(f"benchmark={', '.join(parsed.benchmark_values)}")
+	if parsed.relation_values:
+		parts.append(f"relation_to_half={', '.join(parsed.relation_values)}")
+	if parsed.year is not None:
+		parts.append(f"year={parsed.year}")
+	if parsed.search_name:
+		parts.append(f"name~{parsed.search_name}")
 
-def match_intents(prompt, master_intents, threshold=float(THRESH)/100.0, exact_boost: float = 0.15):
-    prompt = normalize(prompt)
+	if not parts:
+		return "no explicit filters"
+	return "; ".join(parts)
 
-    results = {}  
-    for intent, intent_data in master_intents.items():
-        best = {"option": None, "score": 0.0, "phrase": None}
 
-        for option, phrases in intent_data["options"].items():
-            for phrase in phrases:
-                orig_phrase = phrase
-                phrase = normalize(phrase)
-                score = fuzz.partial_ratio(prompt, phrase) / 100
+def respond_to_prompt(prompt: str, _history: List[Message]) -> str:
+	supabase_db_url = os.getenv("SUPABASE_DB_URL")
+	supabase_url = os.getenv("SUPABASE_URL")
+	supabase_anon_key = os.getenv("SUPABASE_ANON_KEY")
+	parsed = parse_user_prompt(prompt)
 
-                if phrase in prompt:
-                    score = min(1.0, score + exact_boost + 0.25)
+	if supabase_url and supabase_anon_key:
+		try:
+			match_count = run_supabase_query(supabase_url, supabase_anon_key, parsed)
+		except RuntimeError as exc:
+			return str(exc)
+		except Exception as exc:
+			return f"I hit a Supabase client error: {exc}"
 
-                phrase_tokens = set(phrase.split())
-                prompt_tokens = set(prompt.split())
-                token_overlap = len(phrase_tokens & prompt_tokens) / max(1, len(phrase_tokens))
-                score = max(score, token_overlap)
+		if match_count > 0:
+			answer = f"Yes. I found {match_count} matching stimuli."
+		else:
+			answer = "No. I did not find any matching stimuli."
 
-                if score > best["score"]:
-                    best = {"option": option, "score": float(score), "phrase": orig_phrase}
+		debug_summary = _format_filters_for_user(parsed)
+		return (
+			f"{answer}\n\n"
+			f"Filters: {debug_summary}\n"
+			"Mode: Supabase client"
+		)
 
-        if best["score"] >= threshold:
-            results[intent] = best
+	if supabase_db_url:
+		backend = "postgres"
+		db_target = supabase_db_url
+		placeholder_style = "format"
+	else:
+		backend = "sqlite"
+		db_target = os.getenv("FRACTION_DB_PATH", "fraction_finder.db")
+		placeholder_style = "qmark"
 
-    return results
+	sql, params = build_sql(parsed, placeholder_style=placeholder_style)
+
+	try:
+		match_count = run_sql_query(db_target, sql, params, backend=backend)
+	except FileNotFoundError:
+		return (
+			"I could not find your database file. "
+			"Set FRACTION_DB_PATH to your sqlite database path and try again."
+		)
+	except RuntimeError as exc:
+		return str(exc)
+	except Exception as exc:
+		return f"I hit a database error: {exc}"
+
+	if match_count > 0:
+		answer = f"Yes. I found {match_count} matching stimuli."
+	else:
+		answer = "No. I did not find any matching stimuli."
+
+	debug_summary = _format_filters_for_user(parsed)
+	return (
+		f"{answer}\n\n"
+		f"Filters: {debug_summary}\n"
+		f"SQL: {sql}\n"
+		f"Parameters: {params}"
+	)
+
