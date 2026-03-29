@@ -4,3 +4,7 @@ debuglist.txt
 __pycache__
 runtime.txt
 Dockerfile
+all_pairs.csv
+stimuli_output.csv
+.env 
+.streamlit/secrets.toml

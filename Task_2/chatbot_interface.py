@@ -1,13 +1,9 @@
 from __future__ import annotations
-
 from typing import Callable, List, Dict, Sequence
-
 import streamlit as st
-
 
 Message = Dict[str, str]
 Responder = Callable[[str, List[Message]], str]
-
 
 def _messages_key(state_prefix: str) -> str:
     return f"{state_prefix}_messages"
