@@ -176,8 +176,12 @@ def build_query(
 # 5. RESPONSE FORMATTER
 # ═════════════════════════════════════════════════════════════════════════════
 def _df_to_csv_string(df: pd.DataFrame) -> str:
+    out = df.copy()
+    for col in ['fraction_1', 'fraction_2', 'fraction_pair']:
+        if col in out.columns:
+            out[col] = "'" + out[col].astype(str)
     buf = io.StringIO()
-    df.to_csv(buf, index=False)
+    out.to_csv(buf, index=False)
     return buf.getvalue()
 
 
