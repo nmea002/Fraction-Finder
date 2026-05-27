@@ -4,6 +4,10 @@ from Task_1 import chatflow as cf
 from Task_1 import StimuliAnalysis as sa 
 import tempfile
 
+# Capture participant ID from URL
+params = st.query_params
+participant_id = params.get("participant_id", None)
+
 st.set_page_config(page_title="Fraction Finder", layout="centered")
 st.title("Fraction Finder")
 st.sidebar.title("Navigation")
@@ -182,3 +186,8 @@ if st.session_state["generated_file"] is not None:
     if st.button("Start Over"):
         st.session_state.clear()
         st.rerun()
+    
+    # Show post-survey link if participant came from Qualtrics
+    if participant_id:
+        post_survey_url = f"https://ku.co1.qualtrics.com/jfe/form/SV_a4WVBBDhlYh5am2?participant_id={participant_id}"
+        st.link_button("Proceed to Post-Survey", post_survey_url)
