@@ -68,7 +68,9 @@ def render_chat_interface(
     init_chat_state(state_prefix)
 
     st.title(title)
-
+    st.sidebar.title("Navigation")
+    st.sidebar.page_link("FractionFinder.py", label="Fraction Finder")
+    st.sidebar.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
     with st.sidebar:
         st.subheader("Chat Controls")
         if st.button("Clear chat"):

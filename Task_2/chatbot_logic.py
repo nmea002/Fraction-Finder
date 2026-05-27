@@ -1,35 +1,25 @@
 from __future__ import annotations
+import sys, os
+sys.path.append(os.path.dirname(__file__))
 
+from intent_classifier import extract_intents
 import io
-import re
 from typing import List, Dict
 
 import pandas as pd
 import streamlit as st
 from rapidfuzz import process, fuzz
-from sentence_transformers import SentenceTransformer, util
-
-import sys, os
-sys.path.append(os.path.dirname(__file__))
-from words import master_intents
-
-# ── Model (cached so it only loads once) ─────────────────────────────────────
-@st.cache_resource
-def _load_model():
-    return SentenceTransformer("all-MiniLM-L6-v2")
 
 
-# ── DB connection (cached via Streamlit) ──────────────────────────────────────
 def _conn():
     return st.connection("neon", type="sql")
 
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 1. STUDY EXTRACTION  (rapidfuzz against real study names in the DB)
-# ═════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
+# 1. STUDY FUZZY RESOLUTION
+# ═══════════════════════════════════════════════════════
 @st.cache_data(ttl=300)
 def _fetch_study_names() -> Dict[str, int]:
-    """Return {display_label: study_id} e.g. {'DeWolf 2016': 3}"""
+    """Returns {"DeWolf 2016": study_id, ...} for fuzzy matching."""
     df = _conn().query(
         """
         SELECT s.id, s.year, STRING_AGG(DISTINCT a.lname, ', ') AS authors
@@ -39,108 +29,74 @@ def _fetch_study_names() -> Dict[str, int]:
         JOIN authors a          ON a.id = sa.author_id
         GROUP BY s.id, s.year
         """,
-        ttl=300
+        ttl=300,
     )
-    return {f"{row.authors} {row.year}": row.id for row in df.itertuples()}
+    return {f"{row.authors} {row.year}": int(row.id) for row in df.itertuples()}
 
 
-def extract_study(text: str) -> tuple[str | None, int | None]:
-    """Fuzzy-match a study name in the user's text. Returns (label, study_id)."""
+def _resolve_study(raw_label: str | None) -> tuple[str | None, int | None]:
+    """Fuzzy-match an 'Author Year' string to a real study_id."""
+    if not raw_label:
+        return None, None
     study_map = _fetch_study_names()
     if not study_map:
         return None, None
     match, score, _ = process.extractOne(
-        text, list(study_map.keys()), scorer=fuzz.partial_ratio
+        raw_label, list(study_map.keys()), scorer=fuzz.partial_ratio
     )
     if score >= 60:
         return match, study_map[match]
     return None, None
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 2. INTENT EXTRACTION  (sentence-transformers against master_intents)
-# ═════════════════════════════════════════════════════════════════════════════
-# Keywords that suggest a category is being referenced at all
-_CATEGORY_GATES = {
-    "unit":             re.compile(r"\bunit\b", re.I),
-    "benchmark":        re.compile(r"\bbenchmark\b", re.I),
-    "relation_to_half": re.compile(r"\bhalf\b|\b1/2\b", re.I),
-    "compatibility":    re.compile(r"\bmislead|compatible|bias|incompatible\b", re.I),
+# ═══════════════════════════════════════════════════════
+# 2. SQL BUILDER
+# ═══════════════════════════════════════════════════════
+
+# Columns that live directly on the stimuli table
+_STIMULI_FILTER_COLS = {
+    "compatibility":     "s.compatibility",
+    "unit":              "s.unit",
+    "benchmark":         "s.benchmark",
+    "relation_to_half":  "s.relation_to_half",
+    "digit_label_pair":  "s.digit_label_pair",
+    "common_components": "s.common_components",
+    "component_type":    "s.component_type",
+    "gap_type":          "s.gap_type",
+    "pair_order":        "s.pair_order",
 }
 
-def extract_filters(text: str) -> Dict[str, str | None]:
-    """
-    Only match a category if the query actually mentions a relevant keyword,
-    then use semantic similarity to pick the best label within that category.
-    """
-    model = _load_model()
-    query_emb = model.encode(text, convert_to_tensor=True)
-    filters: Dict[str, str | None] = {}
-
-    for category, cfg in master_intents.items():
-        # Skip this category entirely if no gate keyword is found
-        if not _CATEGORY_GATES[category].search(text):
-            filters[category] = None
-            continue
-
-        options = cfg["options"]
-        choices: Dict[str, str] = {}
-        for label, phrases in options.items():
-            for phrase in phrases:
-                choices[phrase] = label
-
-        phrase_list = list(choices.keys())
-        embs = model.encode(phrase_list, convert_to_tensor=True)
-        scores = util.cos_sim(query_emb, embs)[0]
-        best_idx = int(scores.argmax())
-        best_score = float(scores[best_idx])
-
-        filters[category] = choices[phrase_list[best_idx]] if best_score >= 0.35 else None
-
-    return filters
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 3. QUERY INTENT  (count / fetch rows / yes-no)
-# ═════════════════════════════════════════════════════════════════════════════
-_COUNT_RE   = re.compile(r"\b(how many|count|number of|total)\b", re.I)
-_YESNO_RE   = re.compile(r"\b(does|do|is|are|has|have|any|contain|include)\b", re.I)
-_FETCH_RE   = re.compile(r"\b(show|list|give me|return|get|what are|display|all stimuli|just get|fetch)\b", re.I)
-
-def detect_query_type(text: str) -> str:
-    if _COUNT_RE.search(text):  return "count"
-    if _FETCH_RE.search(text):  return "fetch"
-    if _YESNO_RE.search(text):  return "yesno"
-    return "fetch"
-
-
-# ═════════════════════════════════════════════════════════════════════════════
-# 4. SQL BUILDER
-# ═════════════════════════════════════════════════════════════════════════════
-_FILTER_COLS = {
-    "compatibility":    "s.compatibility",
-    "unit":             "s.unit",
-    "benchmark":        "s.benchmark",
-    "relation_to_half": "s.relation_to_half",
-}
 
 def build_query(
     query_type: str,
     study_id: int | None,
-    filters: Dict[str, str | None],
+    intents: dict,
 ) -> tuple[str, dict]:
-    """Return (sql, params)."""
     conditions: List[str] = []
     params: Dict[str, object] = {}
 
+    # --- study_id (resolved from "Author Year" fuzzy match) ---
     if study_id is not None:
         conditions.append("ss.study_id = :study_id")
         params["study_id"] = study_id
 
-    for category, label in filters.items():
-        if label is None:
+    # --- standalone year filter (e.g. "show stimuli from 2016") ---
+    year = intents.get("year")
+    if year is not None:
+        conditions.append("st.year = :year")
+        params["year"] = int(year)
+
+    # --- standalone author lname filter (e.g. "show stimuli by DeWolf") ---
+    author = intents.get("author")
+    if author:
+        conditions.append("a.lname ILIKE :author")
+        params["author"] = author  # ILIKE = case-insensitive match
+
+    # --- stimuli column filters (compatibility, unit, benchmark, relation_to_half) ---
+    for category, col in _STIMULI_FILTER_COLS.items():
+        label = intents.get(category)
+        if not label:
             continue
-        col = _FILTER_COLS[category]
         key = f"p_{category}"
         conditions.append(f"{col} = :{key}")
         params[key] = label
@@ -149,37 +105,37 @@ def build_query(
 
     base = """
         FROM stimuli s
-        JOIN stimuli_studies ss  ON s.id = ss.stimuli_id
-        JOIN studies st          ON ss.study_id = st.id
-        JOIN stimuli_authors sa  ON s.id = sa.stimuli_id
-        JOIN authors a           ON sa.author_id = a.id
+        JOIN stimuli_studies ss ON s.id = ss.stimuli_id
+        JOIN studies st         ON ss.study_id = st.id
+        JOIN stimuli_authors sa ON s.id = sa.stimuli_id
+        JOIN authors a          ON sa.author_id = a.id
     """
 
     if query_type == "count":
         sql = f"SELECT COUNT(*) AS cnt {base} {where}"
     else:
         sql = f"""
-            SELECT s.fraction_1, s.fraction_2, s.fraction_pair,
+            SELECT s.fraction_pair, s.left_fraction, s.right_fraction,
                    s.compatibility, s.unit, s.benchmark, s.relation_to_half,
-                   st.title AS study_title, st.year AS study_year,
-                   STRING_AGG(a.lname, ', ') AS authors
+                   st.year AS study_year,
+                   STRING_AGG(DISTINCT a.lname, ', ') AS authors
             {base} {where}
-            GROUP BY s.id, s.fraction_1, s.fraction_2, s.fraction_pair,
+            GROUP BY s.id, s.left_fraction, s.right_fraction, s.fraction_pair,
                      s.compatibility, s.unit, s.benchmark, s.relation_to_half,
-                     st.title, st.year
+                     st.year
         """
 
     return sql.strip(), params
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 5. RESPONSE FORMATTER
-# ═════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
+# 3. RESPONSE FORMATTER
+# ═══════════════════════════════════════════════════════
 def _df_to_csv_string(df: pd.DataFrame) -> str:
     out = df.copy()
-    for col in ['fraction_1', 'fraction_2', 'fraction_pair']:
+    for col in ['left_fraction', 'right_fraction', 'fraction_pair']:
         if col in out.columns:
-            out[col] = "'" + out[col].astype(str)
+            out[col] = "" + out[col].astype(str)
     buf = io.StringIO()
     out.to_csv(buf, index=False)
     return buf.getvalue()
@@ -189,57 +145,87 @@ def format_response(
     query_type: str,
     df: pd.DataFrame,
     study_label: str | None,
-    filters: Dict[str, str | None],
+    intents: dict,
 ) -> str:
-    active = {k: v for k, v in filters.items() if v}
-    filter_desc = ", ".join(f"{k}={v}" for k, v in active.items())
-    study_desc  = f" in **{study_label}**" if study_label else ""
-    filter_str  = f" with filters `{filter_desc}`" if filter_desc else ""
+    # Separate label filters from source filters (year/author)
+    skip = {"query_type", "study", "year", "author"}
+    label_filters = {k: v for k, v in intents.items() if v and k not in skip}
+    year   = intents.get("year")
+    author = intents.get("author")
+
+    # Build a natural source description
+    if study_label:
+        source_desc = f" in **{study_label}**"
+    elif author and year:
+        source_desc = f" by **{author}** from **{year}**"
+    elif author:
+        source_desc = f" by **{author}** across various studies"
+    elif year:
+        source_desc = f" from studies published in **{year}**"
+    else:
+        source_desc = " across various studies"
+
+    # Build filter description for label columns
+    filter_str = ""
+    if label_filters:
+        filter_str = " with filters `" + ", ".join(f"{k}={v}" for k, v in label_filters.items()) + "`"
 
     if df.empty:
-        return f"No stimuli found{study_desc}{filter_str}."
+        return f"No stimuli found{source_desc}{filter_str}."
 
     if query_type == "count":
         n = int(df.iloc[0]["cnt"])
-        return f"There are **{n}** stimuli{study_desc}{filter_str}. Download them below ⬇️"
+        return f"There are **{n}** stimuli{source_desc}{filter_str}. Download them below ⬇️"
 
     if query_type == "yesno":
         n = len(df)
-        return f"Yes — there are **{n}** matching stimuli{study_desc}{filter_str}."
+        return f"Yes — there are **{n}** matching stimuli{source_desc}{filter_str}."
 
-    # fetch → summary only; download button rendered in Chatbot.py
-    return f"Found **{len(df)}** stimuli{study_desc}{filter_str}. Download the CSV below ⬇️"
+    return f"Here are stimuli{source_desc}{filter_str}. Download the CSV below ⬇️"
 
 
-# ═════════════════════════════════════════════════════════════════════════════
-# 6. MAIN RESPONDER  (plug into render_chat_interface)
-# ═════════════════════════════════════════════════════════════════════════════
+# ═══════════════════════════════════════════════════════
+# 4. MAIN RESPONDER
+# ═══════════════════════════════════════════════════════
 def respond_to_prompt(user_input: str, history: list) -> str:
-    study_label, study_id = extract_study(user_input)
-    filters    = extract_filters(user_input)
-    query_type = detect_query_type(user_input)
+    intents = extract_intents(user_input)
+    print(f"[DEBUG] intents={intents}")  # remove when stable
 
-    # Clear any previous download
+    query_type = intents.get("query_type", "fetch")
+    study_label, study_id = _resolve_study(intents.get("study"))
+
     st.session_state.pop("download_df", None)
 
-    active_filters = {k: v for k, v in filters.items() if v}
-    if study_id is None and not active_filters:
+    # Check that at least one filter was found before hitting the DB
+    has_filter = (
+        study_id is not None
+        or intents.get("year")
+        or intents.get("author")
+        or any(
+            intents.get(k)
+            for k in _STIMULI_FILTER_COLS
+        )
+    )
+    if not has_filter:
         return (
-            "I couldn't find a study or any filter in your question. "
-            "Try something like: *'How many misleading stimuli are in DeWolf 2016?'* "
-            "or *'Get all stimuli from DeWolf 2016'*"
+            "I couldn't find a study, author, year, or any filter in your question. "
+            "Try something like:\n"
+            "- *'How many misleading stimuli are in DeWolf 2016?'*\n"
+            "- *'Show all pairs where both fractions are above half'*\n"
+            "- *'List stimuli by DeWolf'*\n"
+            "- *'Count stimuli from 2016'*"
         )
 
-    sql, params = build_query(query_type, study_id, filters)
+    sql, params = build_query(query_type, study_id, intents)
 
     try:
         df = _conn().query(sql, params=params, ttl=0)
     except Exception as e:
         return f"Database error: {e}"
 
-    # Always fetch rows too so download is available
+    # For count queries, also fetch the rows so the user can download them
     if query_type == "count":
-        fetch_sql, fetch_params = build_query("fetch", study_id, filters)
+        fetch_sql, fetch_params = build_query("fetch", study_id, intents)
         try:
             fetch_df = _conn().query(fetch_sql, params=fetch_params, ttl=0)
             if not fetch_df.empty:
@@ -249,4 +235,4 @@ def respond_to_prompt(user_input: str, history: list) -> str:
     elif not df.empty:
         st.session_state["download_df"] = df
 
-    return format_response(query_type, df, study_label, filters)
+    return format_response(query_type, df, study_label, intents)

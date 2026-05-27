@@ -130,5 +130,122 @@ master_intents = {
                 "incompatible",
             ]
         }
-    }
+    },
+    
+    "digit_label_pair": {
+        "options": {
+            "Both_Only_Double_Digit": [
+                "both double digit",
+                "both are double digit",
+                "only double digit fractions",
+                "both fractions have double digit numbers",
+            ],
+            "Both_Only_Single_Digit": [
+                "both single digit",
+                "both are single digit",
+                "only single digit fractions",
+                "both fractions have single digit numbers",
+            ],
+            "Both_Mixed_Digits": [
+                "both mixed digit",
+                "both have mixed digits",
+                "mixed digit fractions",
+            ],
+            "Different_Digit_Labels": [
+                "different digit labels",
+                "one single digit one double digit",
+                "mixed digit pair",
+                "different digit sizes",
+            ]
+        }
+    },
+
+    "common_components": {
+        "options": {
+            "Common_Numerator": [
+                "same numerator",
+                "common numerator",
+                "equal numerators",
+                "both have the same numerator",
+                "matching numerator",
+            ],
+            "Common_Denominator": [
+                "same denominator",
+                "common denominator",
+                "equal denominators",
+                "both have the same denominator",
+                "matching denominator",
+            ],
+            "No_Common_Components": [
+                "no common components",
+                "different numerator and denominator",
+                "no shared components",
+                "nothing in common",
+            ]
+        }
+    },
+
+    "component_type": {
+        "options": {
+            "Common_Components": [
+                "has common components",
+                "shares a component",
+                "with common components",
+            ],
+            "Without_Common_Components": [
+                "without common components",
+                "no common components",
+                "no shared numerator or denominator",
+            ]
+        }
+    },
+
+    "gap_type": {
+        "options": {
+            "Gap_Compatible": [
+                "gap compatible",
+                "compatible gap",
+                "gap follows whole number bias",
+                "gap consistent with whole number bias",
+            ],
+            "Gap_Incompatible": [
+                "gap incompatible",
+                "incompatible gap",
+                "gap violates whole number bias",
+                "gap goes against whole number bias",
+            ],
+            "Gap_Neutral": [
+                "gap neutral",
+                "neutral gap",
+                "equal gap",
+                "same gap",
+                "both have the same gap",
+            ]
+        }
+    },
+
+    "pair_order": {
+        "options": {
+            "Left_Larger": [
+                "left fraction is larger",
+                "left is bigger",
+                "first fraction is larger",
+                "left larger",
+                "descending order",
+            ],
+            "Right_Larger": [
+                "right fraction is larger",
+                "right is bigger",
+                "second fraction is larger",
+                "right larger",
+                "ascending order",
+            ],
+            "Equal": [
+                "equal fractions",
+                "both fractions are equal",
+                "same value",
+                "fractions are the same",
+            ]
+        }
+    },
 }
