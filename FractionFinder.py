@@ -16,7 +16,9 @@ CHAT_FLOW = cf.chat_flow
 # Capture participant ID from URL
 params = st.query_params
 participant_id = params.get("participant_id", None)
+# st.write(f"DEBUG: participant_id = {participant_id}")  # remove later
 user_id = db_logger.get_or_create_user(participant_id) if participant_id else None
+# st.write(f"DEBUG: user_id = {user_id}")  # remove later
 
 # st.sidebar.title("Navigation")
 # if st.sidebar.button("Chatbot"):
@@ -168,6 +170,15 @@ if current_state == "follow_up_filters" and not st.session_state["filter_queue"]
             "filename": "stimuli_output.csv",
             "task": "fraction_generation"
         }
+        # Add this
+        if user_id:
+            db_logger.log_fraction_generation(
+                user_id,
+                st.session_state["sub_filters"],
+                st.session_state["lower_limit"],
+                st.session_state["upper_limit"],
+                len(output_file)
+            )
         st.session_state["messages"].append({
             "role": "assistant",
             "content": f"Done! {len(output_file)} pairs generated."
