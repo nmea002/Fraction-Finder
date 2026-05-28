@@ -4,6 +4,10 @@ import streamlit as st
 
 
 def main() -> None:
+    # at the top of your chatbot page file
+    params = st.query_params
+    st.session_state["participant_id"] = params.get("participant_id", None)
+
     render_chat_interface(
         title="Stimuli Query Chatbot",
         welcome_text=(

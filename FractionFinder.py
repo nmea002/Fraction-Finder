@@ -1,19 +1,22 @@
 import streamlit as st
 from Task_1 import FractionGeneration as fg
 from Task_1 import chatflow as cf
-from Task_1 import StimuliAnalysis as sa 
+from Task_1 import StimuliAnalysis as sa
 import tempfile
+from Task_1 import db_logger
+
+st.set_page_config(page_title="Fraction Finder", layout="centered")
+st.sidebar.title("Navigation")
+st.sidebar.page_link("FractionFinder.py", label="Fraction Finder")
+st.sidebar.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
+
+st.title("Fraction Finder")
+CHAT_FLOW = cf.chat_flow
 
 # Capture participant ID from URL
 params = st.query_params
 participant_id = params.get("participant_id", None)
-
-st.set_page_config(page_title="Fraction Finder", layout="centered")
-st.title("Fraction Finder")
-st.sidebar.title("Navigation")
-st.sidebar.page_link("FractionFinder.py", label="Fraction Finder")
-st.sidebar.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
-CHAT_FLOW = cf.chat_flow
+user_id = db_logger.get_or_create_user(participant_id) if participant_id else None
 
 # st.sidebar.title("Navigation")
 # if st.sidebar.button("Chatbot"):

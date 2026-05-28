@@ -9,7 +9,7 @@ from typing import List, Dict
 import pandas as pd
 import streamlit as st
 from rapidfuzz import process, fuzz
-
+from Task_1 import db_logger
 
 def _conn():
     return st.connection("neon", type="sql")
@@ -222,7 +222,11 @@ def respond_to_prompt(user_input: str, history: list) -> str:
         df = _conn().query(sql, params=params, ttl=0)
     except Exception as e:
         return f"Database error: {e}"
-
+    
+    participant_id = st.session_state.get("participant_id")
+    if participant_id:
+        user_id = db_logger.get_or_create_user(participant_id)
+        db_logger.log_chatbot_query(user_id, user_input, intents, len(df))
     # For count queries, also fetch the rows so the user can download them
     if query_type == "count":
         fetch_sql, fetch_params = build_query("fetch", study_id, intents)
