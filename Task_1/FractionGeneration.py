@@ -49,26 +49,31 @@ INTENT_COLUMN_MAP = {
 #----------------------
 def getProperFractions(lower=LOWER_LIMIT, upper=UPPER_LIMIT):
     lst = []
-    for j in range(lower, upper + 1):
-        for i in range(lower, j):
+    for i in range(lower, upper + 1):
+        for j in range(lower, upper + 1):
             f = fr.Fraction(numerator=i, denominator=j)
-            lst.append(f)
+            if i < j:
+                lst.append(f)
     return lst
 
 def getFractions(lower=LOWER_LIMIT, upper=UPPER_LIMIT):
     lst = []
     for i in range(lower, upper + 1):
         for j in range(lower, upper + 1):
-            if i != j:
-                f = fr.Fraction(numerator=i, denominator=j)
-                lst.append(f)
+            f = fr.Fraction(numerator=i, denominator=j)
+            lst.append(f)
     return lst
+
 #----------------------
 # Pair Generation
 #----------------------
 def getPairs(default="Proper", lower=LOWER_LIMIT, upper=UPPER_LIMIT):
     fracs = getProperFractions(lower, upper) if default == "Proper" else getFractions(lower, upper)
-    return list(combinations(fracs, 2))
+    pairs = []
+    for a, b in combinations(fracs, 2):
+        pairs.append((a, b))
+        pairs.append((b, a))
+    return pairs
 
 #----------------------
 # DataFrame Build (run once, cache as parquet)
@@ -127,3 +132,17 @@ def getFilteredPairs(intents: list, lower=LOWER_LIMIT, upper=UPPER_LIMIT):
     filtered = applyIntents(df, intents)
     print(f"[DONE] {len(filtered)} pairs after filtering")
     return filtered
+
+def _build_filename(sub_filters: list) -> str:
+    abbrev = {
+        "Compatible": "compat", "Misleading": "misl",
+        "Includes_Unit": "u+", "Excludes_Unit": "u-", "Both_Unit": "uu",
+        "Includes_Benchmark": "b+", "Excludes_Benchmark": "b-", "Both_Benchmark": "bothB",
+        "Both_Above_Half": "both>half", "Both_Below_Half": "both<half", "Crosses": "cross", "Both_Half": "half",
+        "Left_Larger": "L>R", "Right_Larger": "R>L", "Equal": "eq",
+        "Common_Numerator": "cn", "Common_Denominator": "cd", "No_Common_Components": "ncc",
+        "Gap_Compatible": "gapCom", "Gap_Incompatible": "gapInc", "Gap_Neutral": "gapNeu",
+    }
+    parts = [abbrev.get(f, f.lower()[:4]) for f in sub_filters]
+    name = "_".join(parts) if parts else "all"
+    return f"stimuli_{name}.csv"

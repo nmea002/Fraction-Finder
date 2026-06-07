@@ -167,7 +167,7 @@ if current_state == "follow_up_filters" and not st.session_state["filter_queue"]
         )
         st.session_state["generated_file"] = {
             "data": output_file,
-            "filename": "stimuli_output.csv",
+            "filename": fg._build_filename(st.session_state["sub_filters"]),  # <-- here
             "task": "fraction_generation"
         }
         # Add this
