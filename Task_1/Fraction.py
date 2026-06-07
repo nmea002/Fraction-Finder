@@ -53,15 +53,20 @@ class Fraction:
 
     def compatibility(self, f2):
         if self.decimal > f2.decimal:
-            if (self.numerator > f2.numerator) or (self.denominator > f2.denominator):
+            if (self.numerator > f2.numerator) and (self.denominator > f2.denominator):
                 #2/8_1/9
                 return 'Compatible'
+            elif (self.numerator > f2.numerator) or (self.denominator > f2.denominator):
+                #2/5_3/4
+                return 'Neutral'
             else:
                 #1/4_2/9
                 return 'Misleading'
         elif self.decimal < f2.decimal:
-            if (self.numerator < f2.numerator) or (self.denominator < f2.denominator):
+            if (self.numerator < f2.numerator) and (self.denominator < f2.denominator):
                 return 'Compatible'
+            elif (self.numerator < f2.numerator) or (self.denominator < f2.denominator):
+                return 'Neutral'
             else:
                 return 'Misleading'
         else:  

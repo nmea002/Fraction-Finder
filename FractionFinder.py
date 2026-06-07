@@ -6,9 +6,60 @@ import tempfile
 from Task_1 import db_logger
 
 st.set_page_config(page_title="Fraction Finder", layout="centered")
-st.sidebar.title("Navigation")
-st.sidebar.page_link("FractionFinder.py", label="Fraction Finder")
-st.sidebar.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
+
+# -----------------------
+# Nav Bar
+# -----------------------
+st.markdown("""
+<style>
+[data-testid="stSidebar"] .stButton button {
+    background: none;
+    border: none;
+    color: rgba(250, 250, 250, 0.9);
+    padding: 0;
+    font-size: 0.95rem;
+    cursor: pointer;
+    width: 100%;
+    text-align: left;
+    box-shadow: none;
+}
+[data-testid="stSidebar"] .stButton button:hover {
+    background: rgba(250, 250, 250, 0.1);
+    border: none;
+    color: white;
+    box-shadow: none;
+}
+/* Sub-links */
+[data-testid="stSidebar"] [data-testid="nav_fraction_gen"] button,
+[data-testid="stSidebar"] [data-testid="nav_stimuli"] button {
+    color: rgba(250, 250, 250, 0.4);
+    font-size: 0.875rem;
+}
+[data-testid="stSidebar"] [data-testid="nav_fraction_gen"] button:hover,
+[data-testid="stSidebar"] [data-testid="nav_stimuli"] button:hover {
+    color: white;
+}
+/* Chatbot page_link */
+[data-testid="stSidebar"] .stPageLink a {
+    padding-left: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.title("Navigation")
+    if st.button("Fraction Finder", key="nav_home"):
+        st.session_state.clear()
+        st.rerun()
+    if st.button("↳ Stimuli Generation", key="nav_fraction_gen"):
+        st.session_state.clear()
+        st.session_state["state"] = "set_limits"
+        st.rerun()
+    if st.button("↳ Stimuli Analysis", key="nav_stimuli"):
+        st.session_state.clear()
+        st.session_state["state"] = "stimuli_analysis"
+        st.rerun()
+    st.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
 
 st.title("Fraction Finder")
 CHAT_FLOW = cf.chat_flow
