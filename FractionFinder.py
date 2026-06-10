@@ -15,37 +15,32 @@ st.markdown("""
 [data-testid="stSidebar"] .stButton button {
     background: none;
     border: none;
-    color: rgba(250, 250, 250, 0.9);
+    color: var(--text-color);
     padding: 0;
     font-size: 0.95rem;
     cursor: pointer;
     width: 100%;
     text-align: left;
     box-shadow: none;
+    opacity: 1;
 }
 [data-testid="stSidebar"] .stButton button:hover {
-    background: rgba(250, 250, 250, 0.1);
+    background: rgba(128,128,128,0.1);
     border: none;
-    color: white;
     box-shadow: none;
+    opacity: 1;
+    color: var(--text-color);
 }
-/* Sub-links */
 [data-testid="stSidebar"] [data-testid="nav_fraction_gen"] button,
 [data-testid="stSidebar"] [data-testid="nav_stimuli"] button {
-    color: rgba(250, 250, 250, 0.4);
+    opacity: 0.5;
     font-size: 0.875rem;
 }
-[data-testid="stSidebar"] [data-testid="nav_fraction_gen"] button:hover,
-[data-testid="stSidebar"] [data-testid="nav_stimuli"] button:hover {
-    color: white;
-}
-/* Chatbot page_link */
 [data-testid="stSidebar"] .stPageLink a {
     padding-left: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
-
 with st.sidebar:
     st.title("Navigation")
     if st.button("Fraction Finder", key="nav_home"):
