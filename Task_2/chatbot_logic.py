@@ -195,6 +195,21 @@ def respond_to_prompt(user_input: str, history: list) -> str:
     study_label, study_id = _resolve_study(intents.get("study"))
 
     st.session_state.pop("download_df", None)
+    
+    if query_type == "list_studies":
+        df = _conn().query("""
+            SELECT s.title, STRING_AGG(DISTINCT a.lname, ', ') AS authors, s.year
+            FROM studies s
+            JOIN stimuli_studies ss ON ss.study_id = s.id
+            JOIN stimuli_authors sa ON sa.stimuli_id = ss.stimuli_id
+            JOIN authors a ON a.id = sa.author_id
+            GROUP BY s.id, s.title, s.year
+            ORDER BY s.year
+        """, ttl=300)
+        if df.empty:
+            return "No studies found in the database."
+        lines = [f"- **{row.authors} ({row.year})** — {row.title}" for row in df.itertuples()]
+        return "Here are the studies available:\n" + "\n".join(lines)
 
     # Check that at least one filter was found before hitting the DB
     has_filter = (

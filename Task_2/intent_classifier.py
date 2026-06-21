@@ -24,13 +24,17 @@ from words import master_intents
 # ---------------------------------------------------------------------------
 _COUNT_RE = re.compile(r"\b(how many|count|total|number of)\b", re.I)
 _YESNO_RE = re.compile(r"\b(does|is there|are there|any|contain|do .+ have|exist)\b", re.I)
-
+_LIST_STUDIES_RE = re.compile(
+    r"\b(what studies|which studies|list studies|what papers|show studies|all studies|studies in|studies available)\b", re.I
+)
 
 def _infer_query_type(text: str) -> str:
     if _COUNT_RE.search(text):
         return "count"
     if _YESNO_RE.search(text):
         return "yesno"
+    if _LIST_STUDIES_RE.search(text):
+        return "list_studies"
     return "fetch"
 
 
