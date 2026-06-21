@@ -7,6 +7,13 @@ from Task_1 import db_logger
 
 st.set_page_config(page_title="Fraction Finder", layout="centered")
 
+def _safe_clear():
+    """Clear session state without losing the participant_id."""
+    pid = st.session_state.get("participant_id")
+    st.session_state.clear()
+    if pid:
+        st.session_state["participant_id"] = pid
+
 # -----------------------
 # Nav Bar
 # -----------------------
@@ -44,14 +51,14 @@ st.markdown("""
 with st.sidebar:
     st.title("Navigation")
     if st.button("Fraction Finder", key="nav_home"):
-        st.session_state.clear()
+        _safe_clear()
         st.rerun()
     if st.button("↳ Stimuli Generation", key="nav_fraction_gen"):
-        st.session_state.clear()
+        _safe_clear()
         st.session_state["state"] = "set_limits"
         st.rerun()
     if st.button("↳ Stimuli Analysis", key="nav_stimuli"):
-        st.session_state.clear()
+        _safe_clear()
         st.session_state["state"] = "stimuli_analysis"
         st.rerun()
     st.page_link("pages/Stimuli_Query_Chatbot.py", label="Stimuli Query Chatbot")
@@ -59,12 +66,16 @@ with st.sidebar:
 st.title("Fraction Finder")
 CHAT_FLOW = cf.chat_flow
 
-# Capture participant ID from URL
+
+# Capture participant ID from URL — persist in session state so it survives navigation
 params = st.query_params
-participant_id = params.get("participant_id", None)
-# st.write(f"DEBUG: participant_id = {participant_id}")  # remove later
+if "participant_id" not in st.session_state:
+    st.session_state["participant_id"] = params.get("participant_id", None)
+participant_id = st.session_state["participant_id"]
+
+if participant_id:
+    st.query_params["participant_id"] = participant_id
 user_id = db_logger.get_or_create_user(participant_id) if participant_id else None
-# st.write(f"DEBUG: user_id = {user_id}")  # remove later
 
 # st.sidebar.title("Navigation")
 # if st.sidebar.button("Chatbot"):
@@ -244,7 +255,7 @@ if st.session_state["generated_file"] is not None:
     )
 
     if st.button("Start Over"):
-        st.session_state.clear()
+        _safe_clear()
         st.rerun()
     
     # Show post-survey link if participant came from Qualtrics
