@@ -75,7 +75,10 @@ participant_id = st.session_state["participant_id"]
 
 if participant_id:
     st.query_params["participant_id"] = participant_id
-user_id = db_logger.get_or_create_user(participant_id) if participant_id else None
+try:
+    user_id = db_logger.get_or_create_user(participant_id) if participant_id else None
+except Exception:
+    user_id = None
 
 # st.sidebar.title("Navigation")
 # if st.sidebar.button("Chatbot"):
